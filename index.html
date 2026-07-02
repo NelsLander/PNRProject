@@ -594,14 +594,29 @@ function CatManager({cats,onChange,onClose}){
   const addCat=()=>{
     if(!newLabel.trim()) return;
     const id=newLabel.toLowerCase().replace(/\s+/g,"_")+Date.now();
-    setLocal(p=>[...p,{id,label:newLabel.trim(),emoji:newEmojiRef.current,color:newColorRef.current}]);
+    const newEntry={id,label:newLabel.trim(),emoji:newEmojiRef.current,color:newColorRef.current};
+    const updated=[...local,newEntry];
+    setLocal(updated);
+    // Save immediately so the category persists even without hitting Save
+    const out={};updated.forEach(c=>{out[c.id]={label:c.label,emoji:c.emoji,color:c.color};});
+    onChange(out);
     setNewLabel("");setNewEmoji("🎯");setNewColor("#C77DFF");newEmojiRef.current="🎯";newColorRef.current="#C77DFF";
   };
-  const remove=id=>setLocal(p=>p.filter(c=>c.id!==id));
-  const update=(id,key,val)=>setLocal(p=>p.map(c=>c.id===id?{...c,[key]:val}:c));
+  const remove=id=>{
+    const updated=local.filter(c=>c.id!==id);
+    setLocal(updated);
+    const out={};updated.forEach(c=>{out[c.id]={label:c.label,emoji:c.emoji,color:c.color};});
+    onChange(out);
+  };
+  const update=(id,key,val)=>{
+    const updated=local.map(c=>c.id===id?{...c,[key]:val}:c);
+    setLocal(updated);
+    const out={};updated.forEach(c=>{out[c.id]={label:c.label,emoji:c.emoji,color:c.color};});
+    onChange(out);
+  };
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",display:"flex",alignItems:"flex-start",justifyContent:"center",zIndex:250,padding:16,overflowY:"auto"}} onClick={onClose}>
-      <div style={{background:"#161616",border:"1.5px solid #333",borderRadius:16,padding:22,width:"100%",maxWidth:400,marginTop:20}} onClick={e=>e.stopPropagation()}>
+      <div style={{background:"#161616",border:"1.5px solid #333",borderRadius:16,padding:22,width:"100%",maxWidth:400,marginTop:20,maxHeight:"85vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
         <div style={{fontSize:16,fontWeight:800,color:"#f0f0f0",marginBottom:18}}>Manage Categories</div>
         {local.map((c,i)=>(
           <div key={c.id} style={{background:"#111",border:`1.5px solid ${c.color}33`,borderRadius:10,padding:"10px 12px",marginBottom:8}}>
@@ -645,12 +660,9 @@ function CatManager({cats,onChange,onClose}){
               {PRESET_COLORS.map(col=><button key={col} onClick={()=>handleNewColor(col)} style={{width:24,height:24,borderRadius:"50%",background:col,border:newColor===col?"2px solid #fff":"2px solid transparent",cursor:"pointer"}}/>)}
             </div>
           </div>
-          <button onClick={addCat} style={{background:newColor,color:"#000",border:"none",borderRadius:7,padding:"7px 16px",fontWeight:800,fontSize:13,cursor:"pointer"}}>+ Add Category</button>
+          <button onClick={e=>{e.stopPropagation();addCat();}} style={{background:newColor,color:"#000",border:"none",borderRadius:7,padding:"7px 16px",fontWeight:800,fontSize:13,cursor:"pointer"}}>+ Add Category</button>
         </div>
-        <div style={{display:"flex",gap:8}}>
-          <button onClick={save} style={{flex:1,background:"#f0f0f0",color:"#000",border:"none",borderRadius:9,padding:"11px",fontWeight:800,fontSize:14,cursor:"pointer"}}>Save</button>
-          <button onClick={onClose} style={{background:"transparent",color:"#555",border:"1px solid #333",borderRadius:9,padding:"11px 18px",fontSize:14,cursor:"pointer"}}>Cancel</button>
-        </div>
+
       </div>
     </div>
   );
