@@ -47,8 +47,9 @@ if('serviceWorker' in navigator){
 <script type="text/babel">
 const { useState, useEffect } = React;
 
-const VERSION = "v1.7.1";
+const VERSION = "v1.7.2";
 const CHANGELOG = [
+  { version: "v1.7.2", date: "2025-07", note: "Fixed black gap at bottom of category modal on iPhone" },
   { version: "v1.7.1", date: "2025-07", note: "Fixed category modal cutoff on mobile" },
   { version: "v1.7", date: "2025-07", note: "Cache busting, category modal height fix, emoji/color defaults removed" },
   { version: "v1.6", date: "2025-06", note: "Settings tab with category manager, backup & restore" },
@@ -624,7 +625,7 @@ function CatManager({cats,onChange,onClose}){
   };
   return(
     <div style={{position:"fixed",inset:0,background:"rgba(0,0,0,.8)",overflowY:"auto",zIndex:250,padding:"16px",WebkitOverflowScrolling:"touch"}} onClick={onClose}>
-      <div style={{background:"#161616",border:"1.5px solid #333",borderRadius:16,padding:22,width:"100%",maxWidth:400,margin:"20px auto 40px"}} onClick={e=>e.stopPropagation()}>
+      <div style={{background:"#161616",border:"1.5px solid #333",borderRadius:16,padding:22,width:"100%",maxWidth:400,margin:"20px auto 100px"}} onClick={e=>e.stopPropagation()}>
         <div style={{fontSize:16,fontWeight:800,color:"#f0f0f0",marginBottom:18}}>Manage Categories</div>
         {local.map((c,i)=>(
           <div key={c.id} style={{background:"#111",border:`1.5px solid ${c.color}33`,borderRadius:10,padding:"10px 12px",marginBottom:8}}>
