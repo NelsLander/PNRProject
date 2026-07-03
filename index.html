@@ -41,8 +41,9 @@
 <script type="text/babel">
 const { useState, useEffect } = React;
 
-const VERSION = "v1.6";
+const VERSION = "v1.7";
 const CHANGELOG = [
+  { version: "v1.7", date: "2025-06", note: "Emoji/color no longer default on new categories; category changes save instantly" },
   { version: "v1.6", date: "2025-06", note: "Settings tab with category manager, backup & restore" },
   { version: "v1.5", date: "2025-06", note: "Fixed emoji picker not saving on new categories" },
   { version: "v1.4", date: "2025-06", note: "Fixed black screen after opening animation was added" },
@@ -584,10 +585,10 @@ function CatManager({cats,onChange,onClose}){
   const [local,setLocal]=useState(()=>Object.entries(cats).map(([id,v])=>({id,...v})));
   const [editing,setEditing]=useState(null);
   const [newLabel,setNewLabel]=useState("");
-  const [newEmoji,setNewEmoji]=useState("🎯");
-  const [newColor,setNewColor]=useState("#C77DFF");
-  const newEmojiRef=React.useRef("🎯");
-  const newColorRef=React.useRef("#C77DFF");
+  const [newEmoji,setNewEmoji]=useState(null);
+  const [newColor,setNewColor]=useState(null);
+  const newEmojiRef=React.useRef(null);
+  const newColorRef=React.useRef(null);
   const handleNewEmoji=em=>{newEmojiRef.current=em;setNewEmoji(em);};
   const handleNewColor=col=>{newColorRef.current=col;setNewColor(col);};
   const save=()=>{const out={};local.forEach(c=>{out[c.id]={label:c.label,emoji:c.emoji,color:c.color};});onChange(out);onClose();};
@@ -600,7 +601,7 @@ function CatManager({cats,onChange,onClose}){
     // Save immediately so the category persists even without hitting Save
     const out={};updated.forEach(c=>{out[c.id]={label:c.label,emoji:c.emoji,color:c.color};});
     onChange(out);
-    setNewLabel("");setNewEmoji("🎯");setNewColor("#C77DFF");newEmojiRef.current="🎯";newColorRef.current="#C77DFF";
+    setNewLabel("");setNewEmoji(null);setNewColor(null);newEmojiRef.current=null;newColorRef.current=null;
   };
   const remove=id=>{
     const updated=local.filter(c=>c.id!==id);
@@ -652,15 +653,18 @@ function CatManager({cats,onChange,onClose}){
             style={{width:"100%",background:"#1a1a1a",border:"1px solid #333",borderRadius:7,padding:"7px 10px",color:"#f0f0f0",fontSize:14,marginBottom:8,boxSizing:"border-box",outline:"none"}}/>
           <div style={{marginBottom:8}}>
             <div style={{fontSize:11,color:"#444",fontFamily:"monospace",marginBottom:5}}>EMOJI</div>
+            {!newEmoji&&<div style={{fontSize:11,color:"#555",marginBottom:4,fontStyle:"italic"}}>Pick an emoji to continue</div>}
             <EmojiPicker value={newEmoji} onChange={handleNewEmoji}/>
           </div>
           <div style={{marginBottom:10}}>
             <div style={{fontSize:11,color:"#444",fontFamily:"monospace",marginBottom:5}}>COLOR</div>
             <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+              {!newColor&&<div style={{fontSize:11,color:"#555",width:"100%",marginBottom:4,fontStyle:"italic"}}>Pick a color</div>}
               {PRESET_COLORS.map(col=><button key={col} onClick={()=>handleNewColor(col)} style={{width:24,height:24,borderRadius:"50%",background:col,border:newColor===col?"2px solid #fff":"2px solid transparent",cursor:"pointer"}}/>)}
             </div>
           </div>
-          <button onClick={e=>{e.stopPropagation();addCat();}} style={{background:newColor,color:"#000",border:"none",borderRadius:7,padding:"7px 16px",fontWeight:800,fontSize:13,cursor:"pointer"}}>+ Add Category</button>
+          <button onClick={e=>{e.stopPropagation();addCat();}} disabled={!newLabel.trim()||!newEmoji||!newColor}
+            style={{background:newColor||"#333",color:newColor?"#000":"#555",border:"none",borderRadius:7,padding:"7px 16px",fontWeight:800,fontSize:13,cursor:(!newLabel.trim()||!newEmoji||!newColor)?"not-allowed":"pointer",opacity:(!newLabel.trim()||!newEmoji||!newColor)?0.4:1}}>+ Add Category</button>
         </div>
 
       </div>
