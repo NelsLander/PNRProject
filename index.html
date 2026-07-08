@@ -47,8 +47,10 @@ if('serviceWorker' in navigator){
 <script type="text/babel">
 const { useState, useEffect } = React;
 
-const VERSION = "v1.7.5";
+const VERSION = "v1.8";
 const CHANGELOG = [
+  { version: "v1.8", date: "2025-07", note: "Rollover tasks, fixed daily task completion, fixed Just for Fun emoji" },
+  { version: "v1.8", date: "2025-07", note: "Rollover tasks, fixed repeating task completion, fixed category emoji defaults" },
   { version: "v1.7.5", date: "2025-07", note: "Category manager is now a full page, no more modal" },
   { version: "v1.7.4", date: "2025-07", note: "Category modal scrolls internally, no backdrop trap" },
   { version: "v1.7.3", date: "2025-07", note: "Fixed iOS scroll trap in category modal" },
@@ -93,8 +95,20 @@ const DEFAULT_CATS = {
   learning:   { label:"Reading & Learning",  emoji:"📖", color:"#4ECDC4" },
   social:     { label:"Social",             emoji:"🤝", color:"#A8E6CF" },
   sidequests: { label:"Side Quests",        emoji:"🗺️", color:"#FFD93D" },
-  justforfun: { label:"Just for Fun",       emoji:"🎯", color:"#C77DFF" },
+  justforfun: { label:"Just for Fun",       emoji:"🎉", color:"#C77DFF" },
 };
+
+// Migrate old 🎯 default on Just for Fun if still set
+try {
+  const saved = localStorage.getItem("p-cats");
+  if(saved) {
+    const parsed = JSON.parse(saved);
+    if(parsed.justforfun && parsed.justforfun.emoji === "🎯") {
+      parsed.justforfun.emoji = "🎉";
+      localStorage.setItem("p-cats", JSON.stringify(parsed));
+    }
+  }
+} catch(e) {}
 
 const HYPE = {
   complete:["LET'S GO. That's how it's done.","You actually did it. Respect.","That's the version of you that wins.","Momentum is real. Keep going.","Locked in."],
@@ -466,11 +480,12 @@ function AddModal({defaultDate,cats,onAdd,onClose}){
   const [timeStr,setTimeStr]=useState("18:00");
   const [noTime,setNoTime]=useState(false);
   const [repeat,setRepeat]=useState(null);
+  const [rollover,setRollover]=useState(false);
   const submit=()=>{
     if(!title.trim()) return;
     const dl=new Date(`${dateStr}T${noTime?"23:59":timeStr}`).getTime();
     if(isNaN(dl)) return;
-    onAdd({title:title.trim(),category,deadline:dl,noTime:noTime,repeat:repeat||null});
+    onAdd({title:title.trim(),category,deadline:dl,noTime:noTime,repeat:repeat||null,rollover:rollover});
     onClose();
   };
   return(
@@ -507,7 +522,27 @@ function AddModal({defaultDate,cats,onAdd,onClose}){
             }
           </div>
         </div>
-        <div style={{marginBottom:20}}><RepeatPicker value={repeat} onChange={setRepeat}/></div>
+        <div style={{marginBottom:16}}><RepeatPicker value={repeat} onChange={setRepeat}/></div>
+        {!repeat&&(
+          <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:20,padding:"10px 12px",background:"#111",border:"1px solid #2a2a2a",borderRadius:8}}>
+            <div onClick={()=>setRollover(r=>!r)} style={{width:20,height:20,borderRadius:5,border:`2px solid ${rollover?"#4ECDC4":"#444"}`,background:rollover?"#4ECDC4":"transparent",cursor:"pointer",flexShrink:0,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              {rollover&&<span style={{color:"#000",fontSize:13,fontWeight:900,lineHeight:1}}>✓</span>}
+            </div>
+            <div>
+              <div style={{fontSize:13,fontWeight:700,color:"#f0f0f0"}}>🔄 Roll over if not done</div>
+              <div style={{fontSize:11,color:"#555",marginTop:2}}>Moves to tomorrow instead of going to Missed</div>
+            </div>
+          </div>
+        )}
+        <div style={{marginBottom:20,display:"flex",alignItems:"center",gap:10}}>
+          <div onClick={()=>setRollover(r=>!r)} style={{width:20,height:20,borderRadius:5,border:`2px solid ${rollover?"#4ECDC4":"#444"}`,background:rollover?"#4ECDC4":"transparent",cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",flexShrink:0}}>
+            {rollover&&<span style={{color:"#000",fontSize:13,fontWeight:900,lineHeight:1}}>✓</span>}
+          </div>
+          <div>
+            <div style={{fontSize:13,fontWeight:700,color:"#ccc"}}>Roll over if not done</div>
+            <div style={{fontSize:11,color:"#555",marginTop:1}}>Moves to tomorrow instead of going to Missed</div>
+          </div>
+        </div>
         <button onClick={submit} style={{width:"100%",background:cats[category]?.color||"#f0f0f0",color:"#000",border:"none",borderRadius:9,padding:"12px",fontWeight:800,fontSize:15,cursor:"pointer"}}>Lock it in</button>
       </div>
     </div>
@@ -690,7 +725,7 @@ function TaskRow({task,cats,onClick}){
       <span style={{fontSize:13}}>{cat.emoji}</span>
       <div style={{flex:1,minWidth:0}}>
         <div style={{fontSize:13,fontWeight:700,color:"#f0f0f0",whiteSpace:"nowrap",overflow:"hidden",textOverflow:"ellipsis"}}>{task.title}</div>
-        <div style={{fontSize:10,color:urgencyColor(u)||"#555",fontFamily:"monospace"}}>{t?`${t} · `:""}{fmtCountdown(task.deadline)}{rl?" · 🔁":""}</div>
+        <div style={{fontSize:10,color:urgencyColor(u)||"#555",fontFamily:"monospace"}}>{t?`${t} · `:""}{fmtCountdown(task.deadline)}{rl?" · 🔁":""}{task.rollover?" · 🔄":""}</div>
       </div>
     </div>
   );
@@ -778,9 +813,19 @@ function WeekView({baseTasks,cats,viewDate,today,onDayClick,onTaskClick}){
   const futureDays=Array.from({length:numDays},(_,i)=>addDays(today,i));
   const pastDays=Array.from({length:7},(_,i)=>addDays(weekStart,i)); // 7 days before today
 
+  const todayStart=today.getTime();
+  // Bump rollover tasks that are overdue to today
+  const baseTasks2=baseTasks.map(t=>{
+    if(!t.repeat&&t.rollover&&t.deadline<todayStart){
+      return {...t,deadline:todayStart+(12*3600000)};
+    }
+    return t;
+  });
   const allTasksWindow=[
-    ...baseTasks.filter(t=>!t.repeat&&urgency(t.deadline)!=="overdue"),
-    ...baseTasks.filter(t=>t.repeat).flatMap(t=>expandRepeating(t,weekStart,addDays(today,numDays)))
+    ...baseTasks2.filter(t=>!t.repeat&&urgency(t.deadline)!=="overdue"),
+    // Rollover tasks: overdue non-repeat tasks with rollover=true get bumped to today
+    ...baseTasks2.filter(t=>!t.repeat&&t.rollover&&urgency(t.deadline)==="overdue").map(t=>({...t,deadline:today.getTime(),_rolledOver:true})),
+    ...baseTasks2.filter(t=>t.repeat).flatMap(t=>expandRepeating(t,weekStart,addDays(today,numDays)))
       .filter(occ=>{
         const occDay=new Date(occ.deadline);occDay.setHours(0,0,0,0);
         const occDayStart=occDay.getTime();
@@ -1221,7 +1266,16 @@ function App(){
   });
   const [staggerIn,setStaggerIn]=useState(()=>{try{return !!sessionStorage.getItem('splashShown');}catch{return false;}});
   const [appReady,setAppReady]=useState(false);
-  const [cats,setCats]=useState(()=>{try{const s=localStorage.getItem("p-cats");return s?JSON.parse(s):DEFAULT_CATS;}catch{return DEFAULT_CATS;}});
+  const [cats,setCats]=useState(()=>{
+    try{
+      const s=localStorage.getItem("p-cats");
+      if(!s) return DEFAULT_CATS;
+      const parsed=JSON.parse(s);
+      // Migrate: fix justforfun emoji if still bullseye
+      if(parsed.justforfun&&parsed.justforfun.emoji==="🎯") parsed.justforfun.emoji="🎲";
+      return parsed;
+    }catch{return DEFAULT_CATS;}
+  });
   const [tasks,setTasks]=useState(()=>{try{const s=localStorage.getItem("p-tasks");return s?JSON.parse(s):[];}catch{return [];}});
   const [completionLog,setCompletionLog]=useState(()=>{try{const s=localStorage.getItem("p-log");return s?JSON.parse(s):[];}catch{return [];}});
   const [tab,setTab]=useState("calendar"); // calendar | missed | stats
@@ -1253,8 +1307,8 @@ function App(){
     setSelTask(null);
     setFlash({msg:pick(HYPE.complete),color});
     if(t.repeat){
-      // log this completion
-      setCompletionLog(l=>[...l,{taskId:t.id,at:Date.now()}]);
+      // log using the exact occurrence id so the filter can match it
+      setCompletionLog(l=>[...l,{taskId:id,at:Date.now()}]);
     } else {
       setTasks(p=>p.filter(x=>x.id!==parentId&&x.id!==id));
     }
